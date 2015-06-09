@@ -32,62 +32,51 @@ class MicroCoin extends PaymentModule
 	private $_html = '';
 	private $_postErrors = array();
 
-	public $details;
-	public $owner;
+	//public $details;
+	//public $owner;
 	public $address;
 	public $extra_mail_vars;
 	public function __construct()
 	{
 		$this->name = 'microcoin';
 		$this->tab = 'payments_gateways';
-		$this->version = '1.0.7';
-		$this->author = 'PrestaShop';
+		$this->version = '1.0.0';
+		$this->author = 'MicroCoin Dev Team';
 		$this->controllers = array('payment', 'validation');
-		$this->is_eu_compatible = 1;
-
+		
 		$this->currencies = true;
 		$this->currencies_mode = 'checkbox';
 
-		$config = Configuration::getMultiple(array('MICRO_COIN_DETAILS', 'MICRO_COIN_OWNER', 'MICRO_COIN_ADDRESS'));
-		if (!empty($config['MICRO_COIN_OWNER']))
-			$this->owner = $config['MICRO_COIN_OWNER'];
-		if (!empty($config['MICRO_COIN_DETAILS']))
-			$this->details = $config['MICRO_COIN_DETAILS'];
-		if (!empty($config['MICRO_COIN_ADDRESS']))
-			$this->address = $config['MICRO_COIN_ADDRESS'];
-
+		$this->address = Configuration::get('MICRO_COIN_ADDRESS');
+		
 		$this->bootstrap = true;
 		parent::__construct();
 
 		$this->displayName = $this->l('MicroCoin');
 		$this->description = $this->l('Accept payments for your products via MicroCoin transfer.');
-		$this->confirmUninstall = $this->l('Are you sure about removing these details?');
-		if (!isset($this->owner) || !isset($this->details) || !isset($this->address))
-			$this->warning = $this->l('Account owner and account details must be configured before using this module.');
+		$this->confirmUninstall = $this->l('Are you sure about removing?');
+		if (!isset($this->address))
+			$this->warning = $this->l('Account address must be configured before using this module.');
 		if (!count(Currency::checkPaymentCurrencies($this->id)))
 			$this->warning = $this->l('No currency has been set for this module.');
 
 		$this->extra_mail_vars = array(
-										'{microcoin_owner}' => Configuration::get('MICRO_COIN_OWNER'),
-										'{microcoin_details}' => nl2br(Configuration::get('MICRO_COIN_DETAILS')),
-										'{microcoin_address}' => nl2br(Configuration::get('MICRO_COIN_ADDRESS'))
+			'{microcoin_address}' => nl2br(Configuration::get('MICRO_COIN_ADDRESS'))
 										);
 	}
 
 	public function install()
 	{
-		if (!parent::install() || !$this->registerHook('payment') || ! $this->registerHook('displayPaymentEU') || !$this->registerHook('paymentReturn')
-		|| !$this->registerHook('advancedPaymentApi'))
+		if (!parent::install() || !$this->registerHook('payment') /*|| !$this->registerHook('header')*/ )	
 			return false;
 		return true;
+
+		//TODO create db table for payments here
 	}
 
 	public function uninstall()
 	{
-		if (!Configuration::deleteByName('MICRO_COIN_DETAILS')
-				|| !Configuration::deleteByName('MICRO_COIN_OWNER')
-				|| !Configuration::deleteByName('MICRO_COIN_ADDRESS')
-				|| !parent::uninstall())
+		if (!Configuration::deleteByName('MICRO_COIN_ADDRESS') || !parent::uninstall())
 			return false;
 		return true;
 	}
@@ -96,19 +85,14 @@ class MicroCoin extends PaymentModule
 	{
 		if (Tools::isSubmit('btnSubmit'))
 		{
-			if (!Tools::getValue('MICRO_COIN_DETAILS'))
-				$this->_postErrors[] = $this->l('Account details are required.');
-			elseif (!Tools::getValue('MICRO_COIN_OWNER'))
-				$this->_postErrors[] = $this->l('Account owner is required.');
+			if (!Tools::getValue('MICRO_COIN_ADDRESS'))
+				$this->_postErrors[] = $this->l('Address is required.');
 		}
 	}
 
 	private function _postProcess()
 	{
 		if (Tools::isSubmit('btnSubmit'))
-		{
-			Configuration::updateValue('MICRO_COIN_DETAILS', Tools::getValue('MICRO_COIN_DETAILS'));
-			Configuration::updateValue('MICRO_COIN_OWNER', Tools::getValue('MICRO_COIN_OWNER'));
 			Configuration::updateValue('MICRO_COIN_ADDRESS', Tools::getValue('MICRO_COIN_ADDRESS'));
 		}
 		$this->_html .= $this->displayConfirmation($this->l('Settings updated'));
@@ -154,50 +138,17 @@ class MicroCoin extends PaymentModule
 		return $this->display(__FILE__, 'payment.tpl');
 	}
 
-	public function hookDisplayPaymentEU($params)
-	{
-		if (!$this->active)
-			return;
-
-		if (!$this->checkCurrency($params['cart']))
-			return;
-
-		if (isset($params['adv_pay_api']) && $params['adv_pay_api'] === true)
-		{
-			$payment_options = new PaymentOption();
-			$payment_options->cta_text = $this->l('Pay by Bank Wire');
-			$payment_options->logo = Media::getMediaPath(dirname(__FILE__).'/microcoin.jpg');
-			$payment_options->action = $this->context->link->getModuleLink($this->name, 'validation', array(), true);
-		}
-		else
-			$payment_options = array(
-				'cta_text' => $this->l('Pay by Bank Wire'),
-				'logo' => Media::getMediaPath(dirname(__FILE__).'/microcoin.jpg'),
-				'action' => $this->context->link->getModuleLink($this->name, 'validation', array(), true)
-			);
-
-		return $payment_options;
-	}
-
-	public function hookAdvancedPaymentApi($params)
-	{
-		$params['adv_pay_api'] = true;
-		return $this->hookDisplayPaymentEU($params);
-	}
-
 	public function hookPaymentReturn($params)
 	{
 		if (!$this->active)
 			return;
 
 		$state = $params['objOrder']->getCurrentState();
-		if (in_array($state, array(Configuration::get('PS_OS_BANKWIRE'), Configuration::get('PS_OS_OUTOFSTOCK'), Configuration::get('PS_OS_OUTOFSTOCK_UNPAID'))))
+		if (in_array($state, array(Configuration::get('PS_OS_MICROCOIN'), Configuration::get('PS_OS_OUTOFSTOCK'), Configuration::get('PS_OS_OUTOFSTOCK_UNPAID'))))
 		{
 			$this->smarty->assign(array(
 				'total_to_pay' => Tools::displayPrice($params['total_to_pay'], $params['currencyObj'], false),
-				'microcoinDetails' => Tools::nl2br($this->details),
 				'microcoinAddress' => Tools::nl2br($this->address),
-				'microcoinOwner' => $this->owner,
 				'status' => 'ok',
 				'id_order' => $params['objOrder']->id
 			));
@@ -221,34 +172,23 @@ class MicroCoin extends PaymentModule
 		return false;
 	}
 
+	/* public function hookHeader($params) //TODO put here currency conversion as in cryptocurrency module*/
+	
+
 	public function renderForm()
 	{
 		$fields_form = array(
 			'form' => array(
 				'legend' => array(
-					'title' => $this->l('Contact details'),
+					'title' => $this->l('MicroCoin Address'),
 					'icon' => 'icon-envelope'
 				),
-				'input' => array(
-					array(
-						'type' => 'text',
-						'label' => $this->l('Account owner'),
-						'name' => 'MICRO_COIN_OWNER',
-						'required' => true
-					),
-					array(
+				'input' =>  array(
 						'type' => 'textarea',
-						'label' => $this->l('Details'),
-						'name' => 'MICRO_COIN_DETAILS',
-						'desc' => $this->l('Such as bank branch, IBAN number, BIC, etc.'),
-						'required' => true
-					),
-					array(
-						'type' => 'textarea',
-						'label' => $this->l('Bank address'),
+						'label' => $this->l('Address'),
 						'name' => 'MICRO_COIN_ADDRESS',
 						'required' => true
-					),
+					
 				),
 				'submit' => array(
 					'title' => $this->l('Save'),
@@ -280,9 +220,7 @@ class MicroCoin extends PaymentModule
 	public function getConfigFieldsValues()
 	{
 		return array(
-			'MICRO_COIN_DETAILS' => Tools::getValue('MICRO_COIN_DETAILS', Configuration::get('MICRO_COIN_DETAILS')),
-			'MICRO_COIN_OWNER' => Tools::getValue('MICRO_COIN_OWNER', Configuration::get('MICRO_COIN_OWNER')),
-			'MICRO_COIN_ADDRESS' => Tools::getValue('MICRO_COIN_ADDRESS', Configuration::get('MICRO_COIN_ADDRESS')),
+			'MICRO_COIN_ADDRESS' => Tools::getValue('MICRO_COIN_ADDRESS', Configuration::get('MICRO_COIN_ADDRESS'))
 		);
 	}
 }
