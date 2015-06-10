@@ -185,11 +185,12 @@ class MicroCoin extends PaymentModule
 					'icon' => 'icon-envelope'
 				),
 				'input' =>  array(
-						'type' => 'textarea',
+						array(
+						 'type' => 'textarea',
 						'label' => $this->l('Address'),
 						'name' => 'MICRO_COIN_ADDRESS',
-						'required' => true
-					
+						'required' => true	
+						)
 				),
 				'submit' => array(
 					'title' => $this->l('Save'),
