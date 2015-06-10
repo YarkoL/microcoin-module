@@ -93,6 +93,7 @@ class MicroCoin extends PaymentModule
 	private function _postProcess()
 	{
 		if (Tools::isSubmit('btnSubmit'))
+		{
 			Configuration::updateValue('MICRO_COIN_ADDRESS', Tools::getValue('MICRO_COIN_ADDRESS'));
 		}
 		$this->_html .= $this->displayConfirmation($this->l('Settings updated'));
