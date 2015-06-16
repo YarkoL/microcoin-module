@@ -56,8 +56,8 @@ class MicrocoinValidationModuleFrontController extends ModuleFrontController
 		$currency = $this->context->currency;
 		$total = (float)$cart->getOrderTotal(true, Cart::BOTH);
 		$mailVars = array(
-			'{microcoin_owner}' => Configuration::get('MICRO_COIN_OWNER'),
-			'{microcoin_details}' => nl2br(Configuration::get('MICRO_COIN_DETAILS')),
+			//'{microcoin_owner}' => Configuration::get('MICRO_COIN_OWNER'),
+			//'{microcoin_details}' => nl2br(Configuration::get('MICRO_COIN_DETAILS')),
 			'{microcoin_address}' => nl2br(Configuration::get('MICRO_COIN_ADDRESS'))
 		);
 

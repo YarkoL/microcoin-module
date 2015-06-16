@@ -173,7 +173,49 @@ class MicroCoin extends PaymentModule
 		return false;
 	}
 
-	/* public function hookHeader($params) //TODO put here currency conversion as in cryptocurrency module*/
+	public function hookHeader($params) 
+	{
+		$api_url = "https://alcurex.org/api/market.php?pair=mrc_usd&last=last";
+		$mrc_code = "MRC";
+		$cart_currency = $this->context->cart->id_currency;
+		
+		$mrc_currency_id = Db::getInstance()->executeS('
+			SELECT `id_currency`
+			FROM `'._DB_PREFIX_.'currency`
+			WHERE `iso_code`=\''.$mrc_code.'\'');
+		
+		if($mrc_currency_id && $mrc_currency_id[0]['id_currency']==$cart_currency){
+			//some code snippets taken from bitcointicker module
+			$default_currency = new Currency(Configuration::get('PS_CURRENCY_DEFAULT'));
+			$response = file_get_contents($api_url);
+			$object = json_decode($response);
+			
+			if(is_object($object)){
+				$curr = strtolower($default_currency->iso_code);//'USD';
+				//$rate = $object->$curr->{'last'};
+				$rate = $object->{'price'}->$curr;
+				$rate_default = 1.0/floatval($rate);
+				$rate_default_str = trim(sprintf("%.6f", $rate_default));
+				
+				//update conversion_rate on currency table
+				$query='UPDATE IGNORE `'._DB_PREFIX_.'currency` 
+					SET `conversion_rate` = \''.$rate_default_str.'\'
+					WHERE `iso_code` = \''.$mrc_code.'\'';
+				
+				//print_r($query);
+				$return = Db::getInstance()->Execute($query);
+				
+				//update conversion_rate in currency_shop table too
+				$curr_id = strval($mrc_currency_id[0]['id_currency']);
+				$query2='UPDATE IGNORE `'._DB_PREFIX_.'currency_shop` 
+					SET `conversion_rate` = \''.$rate_default_str.'\'
+					WHERE `id_currency`=\''.$curr_id.'\'';
+					
+				$return = Db::getInstance()->Execute($query2);
+			}
+		}
+	}
+	
 	
 
 	public function renderForm()
